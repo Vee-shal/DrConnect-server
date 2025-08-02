@@ -3,24 +3,20 @@ import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import dotenv from "dotenv";
 import { Request, Response } from "express";
+import { registerUserSchema, loginUserSchema } from "../validators/userSchemas.js";
 
-dotenv.config(); // ✅ ensure this is initialized
+dotenv.config();
 
-// Corrected interface according to Prisma model
-interface RegisterUserInput {
-  name: string;
-  email: string;
-  password: string;
-  role: string;
-  phone_number: string; 
-  specialization?: string;
-  experience?: number;
-  license?: string; 
-  certificate?: string; 
-}
-
-export const registerUser = async (req: Request<{}, {}, RegisterUserInput>, res: Response) => {
+export const registerUser = async (req: Request, res: Response) => {
   try {
+    const parseResult = registerUserSchema.safeParse(req.body);
+    if (!parseResult.success) {
+      return res.status(400).json({
+        message: "Validation failed",
+        errors: parseResult.error.issues,
+      });
+    }
+
     const {
       name,
       email,
@@ -31,54 +27,44 @@ export const registerUser = async (req: Request<{}, {}, RegisterUserInput>, res:
       experience,
       license,
       certificate,
-    } = req.body;
-
-    // Basic validation
-    if (!name || !email || !phone_number || !password || !role) {
-      return res.status(400).json({ message: "Required Fields are missing!" });
-    }
+    } = parseResult.data;
 
     // Check if user already exists
-    const existingUser = await prisma.user.findUnique({
-      where: { email },
-    });
-
+    const existingUser = await prisma.user.findUnique({ where: { email } });
     if (existingUser) {
-      return res.status(409).json({ message: "User Already Exists." });
+      return res.status(409).json({ message: "User already exists." });
     }
 
     // Hash password
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // Create user in DB
+    // Create user
     const user = await prisma.user.create({
       data: {
         name,
         email,
-        phoneNumber: phone_number, // ✅ matches Prisma field
+        phoneNumber: phone_number,
         password: hashedPassword,
         role,
         specialization: role === "doctor" ? specialization : null,
         experience: role === "doctor" ? experience : null,
         license: role === "doctor" ? license : null,
-        certificateURL: role === "doctor" && certificate ? Buffer.from(certificate, "base64") : null, // ✅ for Bytes
+        certificateURL:
+          role === "doctor" && certificate
+            ? Buffer.from(certificate, "base64")
+            : null,
       },
     });
 
-    // Generate JWT token
+    // Generate token
     const token = jwt.sign(
-      {
-        id: user.id,
-        email: user.email,
-        role: user.role,
-      },
-      process.env.JWT_SECRET as string, // ✅ Type assertion
-      { expiresIn: "7d" } // ✅ correct key is `expiresIn`
+      { id: user.id, email: user.email, role: user.role },
+      process.env.JWT_SECRET as string,
+      { expiresIn: "7d" }
     );
 
-    // Response
-    res.status(200).json({
-      message: "User Registered Successfully!",
+    return res.status(201).json({
+      message: "User registered successfully",
       user: {
         id: user.id,
         name: user.name,
@@ -91,11 +77,76 @@ export const registerUser = async (req: Request<{}, {}, RegisterUserInput>, res:
         certificate: user.certificateURL
           ? Buffer.from(user.certificateURL).toString("base64")
           : null,
-        token,
       },
+      token,
     });
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: "Server Error" });
+    console.error("Register error:", err);
+    return res.status(500).json({ message: "Server error" });
+  }
+};
+
+export const userLogin = async (req: Request, res: Response) => {
+  try {
+    // Validate input
+    const parseResult = loginUserSchema.safeParse(req.body);
+    if (!parseResult.success) {
+      return res.status(400).json({
+        message: "Validation failed",
+        errors: parseResult.error.issues,
+      });
+    }
+
+    const { email, password } = parseResult.data;
+
+    // Find user
+    const user = await prisma.user.findUnique({ where: { email } });
+    if (!user) {
+      return res.status(404).json({
+        message: "User does not exist. Please register first.",
+      });
+    }
+
+    // Compare passwords
+    const isMatch = await bcrypt.compare(password, user.password);
+    if (!isMatch) {
+      return res.status(401).json({ message: "Invalid password." });
+    }
+
+    // Generate token
+    const token = jwt.sign(
+      { id: user.id, email: user.email, role: user.role },
+      process.env.JWT_SECRET as string,
+      { expiresIn: "7d" }
+    );
+
+    return res.status(200).json({
+      message: "Login successful",
+      user: {
+        id: user.id,
+        name: user.name,
+        role: user.role,
+        email: user.email,
+        phone_number: user.phoneNumber,
+        specialization: user.specialization,
+        experience: user.experience,
+        license: user.license,
+        certificate: user.certificateURL
+          ? Buffer.from(user.certificateURL).toString("base64")
+          : null,
+      },
+      token,
+    });
+  } catch (error) {
+    console.error("Login error:", error);
+    return res.status(500).json({
+      message: "Internal server error",
+      error:
+        typeof error === "object" &&
+        error !== null &&
+        "message" in error
+          ? (error as { message: string }).message
+          : String(error),
+    });
   }
 };
