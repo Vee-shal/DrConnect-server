@@ -38,18 +38,11 @@ export const registerUser = async (req: Request, res: Response) => {
     // Hash password
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // ⛑️ Try to convert certificate safely
-    let certificateBuffer: Buffer | null = null;
-    if (role === "doctor" && certificate) {
-      try {
-        certificateBuffer = Buffer.from(certificate, "base64");
-      } catch (e) {
-        console.error("❌ Invalid base64 certificate:", e);
-        return res.status(400).json({ message: "Invalid certificate format." });
-      }
-    }
+    // Check role
+    const isDoctor = role === "doctor";
+    const isPatient = role === "patient";
 
-    // Create user
+    // Create user based on role
     const user = await prisma.user.create({
       data: {
         name,
@@ -57,10 +50,12 @@ export const registerUser = async (req: Request, res: Response) => {
         phoneNumber: phone_number,
         password: hashedPassword,
         role,
-        specialization: role === "doctor" ? specialization : null,
-        experience: role === "doctor" ? experience : null,
-        license: role === "doctor" ? license : null,
-        certificateURL: certificateBuffer,
+        specialization: isDoctor ? specialization : null,
+        experience: isDoctor ? experience : null,
+        license: isDoctor ? license : null,
+        certificateURL: isDoctor && certificate
+          ? Buffer.from(certificate, "base64")
+          : null,
       },
     });
 
@@ -93,6 +88,7 @@ export const registerUser = async (req: Request, res: Response) => {
     return res.status(500).json({ message: "Server error" });
   }
 };
+
 
 
 export const userLogin = async (req: Request, res: Response) => {
