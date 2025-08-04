@@ -30,7 +30,9 @@ export const registerUser = (req, res) => __awaiter(void 0, void 0, void 0, func
         }
         // Hash password
         const hashedPassword = yield bcrypt.hash(password, 10);
-        // Create user
+        // Check role
+        const isDoctor = role === "doctor";
+        // Create user based on role
         const user = yield prisma.user.create({
             data: {
                 name,
@@ -38,10 +40,10 @@ export const registerUser = (req, res) => __awaiter(void 0, void 0, void 0, func
                 phoneNumber: phone_number,
                 password: hashedPassword,
                 role,
-                specialization: role === "doctor" ? specialization : null,
-                experience: role === "doctor" ? experience : null,
-                license: role === "doctor" ? license : null,
-                certificateURL: role === "doctor" && certificate
+                specialization: isDoctor ? specialization : null,
+                experience: isDoctor ? experience : null,
+                license: isDoctor ? license : null,
+                certificateURL: isDoctor && certificate
                     ? Buffer.from(certificate, "base64")
                     : null,
             },

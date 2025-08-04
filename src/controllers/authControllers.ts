@@ -40,8 +40,6 @@ export const registerUser = async (req: Request, res: Response) => {
 
     // Check role
     const isDoctor = role === "doctor";
-    const isPatient = role === "patient";
-
     // Create user based on role
     const user = await prisma.user.create({
       data: {
