@@ -7,18 +7,18 @@ generator client {
   provider = "prisma-client-js"
 }
 
-// Add your models here
 model User {
-  id             Int     @id @default(autoincrement())
+  id             Int      @id @default(autoincrement())
   name           String
-  email          String  @unique
-  role           String 
+  email          String   @unique
+  role           String
   password       String
-  phoneNumber    String  @unique 
-  specialization String?        
-  experience     Int?         
-  license        String?        
-  certificateURL Bytes?  
+  phoneNumber    String   @unique
+  specialization String?
+  experience     Int?
+  license        String?
+  verified       Boolean  @default(false)
+  offlinePrice   Int?
+  onlinePrice    Int?
   createdAt      DateTime @default(now())
 }
-

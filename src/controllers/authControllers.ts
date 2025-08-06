@@ -3,7 +3,25 @@ import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import dotenv from "dotenv";
 import { Request, Response } from "express";
-import { registerUserSchema, loginUserSchema } from "../validators/userSchemas.js";
+import {
+  registerUserSchema,
+  loginUserSchema,
+} from "../validators/userSchemas.js";
+import { createClient } from "redis";
+import nodemailer from "nodemailer";
+
+// Redis Client Setup
+const redisClient = createClient({
+  username: process.env.REDIS_USERNAME || "default",
+  password: process.env.REDIS_PASSWORD,
+  socket: {
+    host: process.env.REDIS_HOST,
+    port: parseInt(process.env.REDIS_PORT || "6379"),
+  },
+});
+
+redisClient.on("error", (err) => console.log("Redis Client Error", err));
+redisClient.connect();
 
 dotenv.config();
 
@@ -26,7 +44,7 @@ export const registerUser = async (req: Request, res: Response) => {
       specialization,
       experience,
       license,
-      certificate,
+      verified,
     } = parseResult.data;
 
     // Check if user already exists
@@ -48,12 +66,14 @@ export const registerUser = async (req: Request, res: Response) => {
         phoneNumber: phone_number,
         password: hashedPassword,
         role,
-        specialization: isDoctor ? specialization : null,
-        experience: isDoctor ? experience : null,
-        license: isDoctor ? license : null,
-        certificateURL: isDoctor && certificate
-          ? Buffer.from(certificate, "base64")
-          : null,
+        specialization: role === "doctor" ? specialization : null,
+        experience: role === "doctor" ? experience : null,
+        license: role === "doctor" ? license : null,
+        verified,
+        // certificateURL:
+        //   role === "doctor" && certificate
+        //     ? Buffer.from(certificate, "base64")
+        //     : null,
       },
     });
 
@@ -64,7 +84,7 @@ export const registerUser = async (req: Request, res: Response) => {
       { expiresIn: "7d" }
     );
 
-    return res.status(201).json({
+    return res.status(200).json({
       message: "User registered successfully",
       user: {
         id: user.id,
@@ -75,11 +95,10 @@ export const registerUser = async (req: Request, res: Response) => {
         specialization: user.specialization,
         experience: user.experience,
         license: user.license,
-        certificate: user.certificateURL
-          ? Buffer.from(user.certificateURL).toString("base64")
-          : null,
+        verified,
       },
       token,
+      status: 200,
     });
   } catch (err) {
     console.error("Register error:", err);
@@ -134,22 +153,136 @@ export const userLogin = async (req: Request, res: Response) => {
         specialization: user.specialization,
         experience: user.experience,
         license: user.license,
-        certificate: user.certificateURL
-          ? Buffer.from(user.certificateURL).toString("base64")
-          : null,
+        verified: user.verified,
+        // certificate: user.certificateURL
+        //   ? Buffer.from(user.certificateURL).toString("base64")
+        //   : null,
       },
       token,
+      status: 200,
     });
   } catch (error) {
     console.error("Login error:", error);
     return res.status(500).json({
       message: "Internal server error",
       error:
-        typeof error === "object" &&
-        error !== null &&
-        "message" in error
+        typeof error === "object" && error !== null && "message" in error
           ? (error as { message: string }).message
           : String(error),
+    });
+  }
+};
+
+export const forgotPassword = async (req: Request, res: Response) => {
+  try {
+    const { email } = req.body;
+
+    // Check if user exists
+    const user = await prisma.user.findUnique({ where: { email } });
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    // Generate OTP (6 digits)
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+
+    // Store OTP in Redis with 5-minute expiry
+    await redisClient.setEx(`password_reset:${email}`, 300, otp);
+
+    // Setup nodemailer transporter (Gmail example)
+    const transporter = nodemailer.createTransport({
+      service: "gmail",
+      auth: {
+        user: process.env.SMTP_EMAIL, // e.g. your Gmail address
+        pass: process.env.SMTP_PASSWORD, // Gmail App Password, NOT your real password
+      },
+    });
+
+    // Email options
+    const mailOptions = {
+      from: `"DrConnect" <${process.env.SMTP_EMAIL}>`,
+      to: email,
+      subject: "DrConnect - Password Reset OTP",
+      html: `
+        <div style="font-family:sans-serif">
+          <h2>Password Reset Request</h2>
+          <p>Hello ${user.name},</p>
+          <p>Your OTP for resetting your password is:</p>
+          <h3>${otp}</h3>
+          <p>This OTP will expire in 5 minutes.</p>
+        </div>
+      `,
+    };
+
+    // Send email
+    await transporter.sendMail(mailOptions);
+
+    return res.status(200).json({
+      message: "OTP sent successfully to your email",
+      status: 200,
+    });
+  } catch (err) {
+    console.error("Forgot password error:", err);
+    return res.status(500).json({ message: "Server error" });
+  }
+};
+
+export const verifyOTP = async (req: Request, res: Response) => {
+  try {
+    const { email, otp } = req.body;
+
+    // Verify OTP
+    const storedOTP = await redisClient.get(`password_reset:${email}`);
+
+    if (!storedOTP) {
+      return res.status(400).json({
+        message: "OTP expired or invalid",
+        status: 400,
+      });
+    }
+
+    if (storedOTP !== otp) {
+      return res.status(400).json({
+        message: "Invalid OTP",
+        status: 400,
+      });
+    }
+
+    // Delete the OTP from Redis
+    await redisClient.del(`password_reset:${email}`);
+
+    //set flag that otp verified
+    await redisClient.setEx(`otp-verified:${email}`, 300, "true");
+    return res.status(200).json({
+      message: "OTP MATCHED",
+      status: 200,
+    });
+  } catch (err) {
+    console.error("Verify OTP error:", err);
+    return res.status(500).json({ message: "Server error" });
+  }
+};
+
+export const resetPassword = async (req: Request, res: Response) => {
+  const { email, newPassword } = req.body;
+  const is_verified =
+    (await redisClient.get(`otp-verified:${email}`)) === "true";
+    // OTP verified - update password
+    if (is_verified) {
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+    await prisma.user.update({
+      where: { email },
+      data: { password: hashedPassword },
+    });
+    await redisClient.del(`otp-verified:${email}`);
+    return res.status(200).json({
+      message: "Password reset successful",
+      status: 200,
+    });
+  }else{
+     return res.status(403).json({
+      message: "OTP not verified or expired",
+        status: 403,
     });
   }
 };
