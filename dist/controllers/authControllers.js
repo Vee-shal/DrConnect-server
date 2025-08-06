@@ -12,20 +12,20 @@ import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import dotenv from "dotenv";
 import { registerUserSchema, loginUserSchema, } from "../validators/userSchemas.js";
-import { createClient } from 'redis';
+import { createClient } from "redis";
 import nodemailer from "nodemailer";
+dotenv.config();
 // Redis Client Setup
 const redisClient = createClient({
-    username: process.env.REDIS_USERNAME || 'default',
+    username: process.env.REDIS_USERNAME || "default",
     password: process.env.REDIS_PASSWORD,
     socket: {
         host: process.env.REDIS_HOST,
-        port: parseInt(process.env.REDIS_PORT || '6379')
-    }
+        port: parseInt(process.env.REDIS_PORT || "6379"),
+    },
 });
-redisClient.on('error', err => console.log('Redis Client Error', err));
+redisClient.on("error", (err) => console.log("Redis Client Error", err));
 redisClient.connect();
-dotenv.config();
 export const registerUser = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const parseResult = registerUserSchema.safeParse(req.body);
@@ -35,7 +35,7 @@ export const registerUser = (req, res) => __awaiter(void 0, void 0, void 0, func
                 errors: parseResult.error.issues,
             });
         }
-        const { name, email, password, role, phone_number, specialization, experience, license, verified } = parseResult.data;
+        const { name, email, password, role, phone_number, specialization, experience, license, verified, } = parseResult.data;
         // Check if user already exists
         const existingUser = yield prisma.user.findUnique({ where: { email } });
         if (existingUser) {
@@ -76,7 +76,7 @@ export const registerUser = (req, res) => __awaiter(void 0, void 0, void 0, func
                 specialization: user.specialization,
                 experience: user.experience,
                 license: user.license,
-                verified
+                verified,
             },
             token,
             status: 200,
@@ -142,7 +142,6 @@ export const userLogin = (req, res) => __awaiter(void 0, void 0, void 0, functio
         });
     }
 });
-;
 export const forgotPassword = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const { email } = req.body;
@@ -192,36 +191,55 @@ export const forgotPassword = (req, res) => __awaiter(void 0, void 0, void 0, fu
 });
 export const verifyOTP = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const { email, otp, newPassword } = req.body;
+        const { email, otp } = req.body;
         // Verify OTP
         const storedOTP = yield redisClient.get(`password_reset:${email}`);
         if (!storedOTP) {
             return res.status(400).json({
                 message: "OTP expired or invalid",
-                status: 400
+                status: 400,
             });
         }
         if (storedOTP !== otp) {
             return res.status(400).json({
                 message: "Invalid OTP",
-                status: 400
+                status: 400,
             });
         }
-        // OTP verified - update password
-        const hashedPassword = yield bcrypt.hash(newPassword, 10);
-        yield prisma.user.update({
-            where: { email },
-            data: { password: hashedPassword }
-        });
         // Delete the OTP from Redis
         yield redisClient.del(`password_reset:${email}`);
+        //set flag that otp verified
+        yield redisClient.setEx(`otp-verified:${email}`, 300, "true");
         return res.status(200).json({
-            message: "Password reset successfully",
-            status: 200
+            message: "OTP MATCHED",
+            status: 200,
         });
     }
     catch (err) {
         console.error("Verify OTP error:", err);
         return res.status(500).json({ message: "Server error" });
+    }
+});
+export const resetPassword = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    const { email, newPassword } = req.body;
+    const is_verified = (yield redisClient.get(`otp-verified:${email}`)) === "true";
+    // OTP verified - update password
+    if (is_verified) {
+        const hashedPassword = yield bcrypt.hash(newPassword, 10);
+        yield prisma.user.update({
+            where: { email },
+            data: { password: hashedPassword },
+        });
+        yield redisClient.del(`otp-verified:${email}`);
+        return res.status(200).json({
+            message: "Password reset successful",
+            status: 200,
+        });
+    }
+    else {
+        return res.status(403).json({
+            message: "OTP not verified or expired",
+            status: 403,
+        });
     }
 });

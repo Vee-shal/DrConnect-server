@@ -10,6 +10,9 @@ import {
 import { createClient } from "redis";
 import nodemailer from "nodemailer";
 
+
+dotenv.config();
+
 // Redis Client Setup
 const redisClient = createClient({
   username: process.env.REDIS_USERNAME || "default",
@@ -23,7 +26,9 @@ const redisClient = createClient({
 redisClient.on("error", (err) => console.log("Redis Client Error", err));
 redisClient.connect();
 
-dotenv.config();
+
+
+
 
 export const registerUser = async (req: Request, res: Response) => {
   try {
@@ -267,8 +272,8 @@ export const resetPassword = async (req: Request, res: Response) => {
   const { email, newPassword } = req.body;
   const is_verified =
     (await redisClient.get(`otp-verified:${email}`)) === "true";
-    // OTP verified - update password
-    if (is_verified) {
+  // OTP verified - update password
+  if (is_verified) {
     const hashedPassword = await bcrypt.hash(newPassword, 10);
     await prisma.user.update({
       where: { email },
@@ -279,10 +284,10 @@ export const resetPassword = async (req: Request, res: Response) => {
       message: "Password reset successful",
       status: 200,
     });
-  }else{
-     return res.status(403).json({
+  } else {
+    return res.status(403).json({
       message: "OTP not verified or expired",
-        status: 403,
+      status: 403,
     });
   }
 };

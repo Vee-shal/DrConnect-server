@@ -18,7 +18,27 @@ model User {
   experience     Int?
   license        String?
   verified       Boolean  @default(false)
-  offlinePrice   Int?
+
+  createdAt      DateTime @default(now())
+
+  doctorProfile DoctorProfile?
+}
+
+model DoctorProfile{
+  id             Int      @id @default(autoincrement())
+  userId         Int      @unique
+  user           User     @relation(fields: [userId], references: [id])
+
+  verified       Boolean  @default(false)
   onlinePrice    Int?
+ 
+  available      Boolean  @default(true)
+  bio            String?
+
+  offline        Boolean  @default(false)
+  clinicName     String?
+  clinicAddress  String?
+   offlinePrice   Int?
+
   createdAt      DateTime @default(now())
 }
