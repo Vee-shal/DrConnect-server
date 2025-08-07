@@ -8,37 +8,45 @@ generator client {
 }
 
 model User {
-  id             Int      @id @default(autoincrement())
+  id             Int             @id @default(autoincrement())
   name           String
-  email          String   @unique
+  email          String          @unique
   role           String
   password       String
-  phoneNumber    String   @unique
+  phoneNumber    String          @unique
   specialization String?
   experience     Int?
   license        String?
-  verified       Boolean  @default(false)
+  verified       Boolean         @default(false)
+  createdAt      DateTime        @default(now())
 
-  createdAt      DateTime @default(now())
-
-  doctorProfile DoctorProfile?
+  doctorProfile  DoctorProfile?
+  patientProfile Patient?        
 }
 
-model DoctorProfile{
-  id             Int      @id @default(autoincrement())
-  userId         Int      @unique
-  user           User     @relation(fields: [userId], references: [id])
 
-  verified       Boolean  @default(false)
-  onlinePrice    Int?
- 
-  available      Boolean  @default(true)
-  bio            String?
-
-  offline        Boolean  @default(false)
-  clinicName     String?
-  clinicAddress  String?
-   offlinePrice   Int?
-
-  createdAt      DateTime @default(now())
+model DoctorProfile {
+  id            Int      @id @default(autoincrement())
+  userId        Int      @unique
+  user          User     @relation(fields: [userId], references: [id])
+  verified      Boolean  @default(false)
+  onlinePrice   Int?
+  available     Boolean  @default(true)
+  bio           String?
+  offline       Boolean  @default(false)
+  clinicName    String?
+  clinicAddress String?
+  offlinePrice  Int?
+  createdAt     DateTime @default(now())
 }
+
+model Patient {
+  id            Int      @id @default(autoincrement())
+  userId        Int      @unique
+  user          User     @relation(fields: [userId], references: [id])
+  gender        String
+  age           Int
+  bloodGroup    String?
+  createdAt     DateTime @default(now())
+}
+
