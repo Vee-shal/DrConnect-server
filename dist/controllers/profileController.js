@@ -8,7 +8,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     });
 };
 import prisma from "../config/db.js";
-export const updateUser = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+export const updateDoctor = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const { email, onlinePrice, offlinePrice, clinicName, clinicAddress, bio, } = req.body;
         // 1. Fetch user by email
@@ -70,4 +70,6 @@ export const updateUser = (req, res) => __awaiter(void 0, void 0, void 0, functi
             error,
         });
     }
+});
+export const updatePatients = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
 });

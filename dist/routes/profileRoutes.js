@@ -1,5 +1,5 @@
 import express from "express";
-import { updateUser } from "../controllers/profileController.js";
+import { updateDoctor } from "../controllers/profileController.js";
 const router = express.Router();
-router.post("/update", updateUser);
+router.post("/update", updateDoctor);
 export default router;

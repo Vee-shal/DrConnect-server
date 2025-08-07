@@ -8,22 +8,21 @@ generator client {
 }
 
 model User {
-  id             Int             @id @default(autoincrement())
+  id             Int      @id @default(autoincrement())
   name           String
-  email          String          @unique
+  email          String   @unique
   role           String
   password       String
-  phoneNumber    String          @unique
+  phoneNumber    String   @unique
   specialization String?
   experience     Int?
   license        String?
-  verified       Boolean         @default(false)
-  createdAt      DateTime        @default(now())
+  verified       Boolean  @default(false)
+  createdAt      DateTime @default(now())
 
   doctorProfile  DoctorProfile?
-  patientProfile Patient?        
+  patientProfile Patient?
 }
-
 
 model DoctorProfile {
   id            Int      @id @default(autoincrement())
@@ -41,12 +40,11 @@ model DoctorProfile {
 }
 
 model Patient {
-  id            Int      @id @default(autoincrement())
-  userId        Int      @unique
-  user          User     @relation(fields: [userId], references: [id])
-  gender        String
-  age           Int
-  bloodGroup    String?
-  createdAt     DateTime @default(now())
+  id         Int      @id @default(autoincrement())
+  userId     Int      @unique
+  user       User     @relation(fields: [userId], references: [id])
+  gender     String
+  age        Int
+  bloodGroup String?
+  createdAt  DateTime @default(now())
 }
-
