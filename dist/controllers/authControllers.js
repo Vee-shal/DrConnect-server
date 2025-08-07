@@ -56,7 +56,7 @@ export const registerUser = (req, res) => __awaiter(void 0, void 0, void 0, func
                 specialization: role === "doctor" ? specialization : null,
                 experience: role === "doctor" ? experience : null,
                 license: role === "doctor" ? license : null,
-                verified,
+                verified: false,
                 // certificateURL:
                 //   role === "doctor" && certificate
                 //     ? Buffer.from(certificate, "base64")

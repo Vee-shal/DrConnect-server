@@ -74,7 +74,7 @@ export const registerUser = async (req: Request, res: Response) => {
         specialization: role === "doctor" ? specialization : null,
         experience: role === "doctor" ? experience : null,
         license: role === "doctor" ? license : null,
-        verified,
+        verified : false,
         // certificateURL:
         //   role === "doctor" && certificate
         //     ? Buffer.from(certificate, "base64")
