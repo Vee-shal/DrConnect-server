@@ -43,6 +43,8 @@ model Patient {
   id         Int      @id @default(autoincrement())
   userId     Int      @unique
   user       User     @relation(fields: [userId], references: [id])
+  height     Int
+  weight     Float
   gender     String
   age        Int
   bloodGroup String?

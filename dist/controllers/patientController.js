@@ -9,8 +9,36 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 };
 import { PrismaClient } from "@prisma/client";
 const prisma = new PrismaClient();
-export const getPatients = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    res.json({
-        name: "manoj"
-    });
+export const getPatient = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const { email } = req.body;
+        // ✅ Find patient with matching user email
+        const existingPatient = yield prisma.patient.findFirst({
+            where: {
+                user: { email },
+            },
+            include: {
+                user: true, // Include user details
+            },
+        });
+        if (!existingPatient) {
+            return res.status(404).json({
+                message: "Patient not found",
+                success: false,
+            });
+        }
+        return res.status(200).json({
+            message: "Patient found",
+            data: existingPatient,
+            success: true,
+        });
+    }
+    catch (error) {
+        console.error("Get Patient Error:", error);
+        return res.status(500).json({
+            message: "Something went wrong while fetching patient data",
+            success: false,
+            error,
+        });
+    }
 });

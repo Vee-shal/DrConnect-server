@@ -8,9 +8,12 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     });
 };
 import prisma from "../config/db.js";
+// ==========================
+// Update or Create Doctor Profile
+// ==========================
 export const updateDoctor = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const { email, onlinePrice, offlinePrice, clinicName, clinicAddress, bio, } = req.body;
+        const { email, onlinePrice, offlinePrice, clinicName, clinicAddress, bio } = req.body;
         // 1. Fetch user by email
         const existingUser = yield prisma.user.findUnique({ where: { email } });
         if (!existingUser) {
@@ -35,7 +38,7 @@ export const updateDoctor = (req, res) => __awaiter(void 0, void 0, void 0, func
                     clinicName,
                     clinicAddress,
                     bio,
-                    verified: false, // admin will verify later
+                    verified: false, // Reset to false so admin must verify again
                 },
             });
         }
@@ -54,22 +57,89 @@ export const updateDoctor = (req, res) => __awaiter(void 0, void 0, void 0, func
         }
         return res.status(200).json({
             success: true,
-            message: "User updated successfully",
+            message: "Doctor profile updated successfully",
             data: {
                 updatedUser: existingUser,
                 doctorProfile,
             },
-            status: 200,
         });
     }
     catch (error) {
-        console.error("Update error:", error);
-        res.status(500).json({
+        console.error("Update Doctor Error:", error);
+        return res.status(500).json({
             success: false,
-            message: "Something went wrong",
+            message: "Something went wrong while updating doctor profile",
             error,
         });
     }
 });
-export const updatePatients = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+// ==========================
+// Update or Create Patient Profile
+// ==========================
+export const updatePatient = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const { email, age, weight, height, gender, bloodGroup } = req.body;
+        // 1. Fetch user by email
+        const existingUser = yield prisma.user.findUnique({ where: { email } });
+        if (!existingUser) {
+            return res.status(400).json({
+                success: false,
+                message: "Patient not found with the given email",
+            });
+        }
+        const userId = existingUser.id;
+        // 2. Check if patient profile exists
+        const existingPatient = yield prisma.patient.findUnique({
+            where: { userId },
+        });
+        let patientProfile;
+        if (existingPatient) {
+            // ✅ Update patient if exists
+            patientProfile = yield prisma.patient.update({
+                where: { userId },
+                data: {
+                    age,
+                    weight,
+                    height,
+                    gender,
+                    bloodGroup,
+                },
+            });
+            return res.status(200).json({
+                success: true,
+                message: "Patient updated successfully",
+                data: {
+                    updatedUser: existingUser,
+                    patientProfile,
+                },
+            });
+        }
+        // ✅ Create new patient if not exists
+        patientProfile = yield prisma.patient.create({
+            data: {
+                age,
+                height,
+                weight,
+                bloodGroup,
+                gender,
+                user: { connect: { id: userId } }, // Correctly connect to existing user
+            },
+        });
+        return res.status(200).json({
+            success: true,
+            message: "New patient created successfully",
+            data: {
+                createdUser: existingUser,
+                patientProfile,
+            },
+        });
+    }
+    catch (error) {
+        console.error("Update Patient Error:", error);
+        return res.status(500).json({
+            success: false,
+            message: "Something went wrong while updating patient profile",
+            error,
+        });
+    }
 });

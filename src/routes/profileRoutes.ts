@@ -1,9 +1,10 @@
 import express from "express"
-import { updateDoctor } from "../controllers/profileController.js";
+import { updateDoctor, updatePatient } from "../controllers/profileController.js";
 
 
 const router = express.Router();
  
-router.post("/update",updateDoctor)
+router.post("/update-doctor",updateDoctor)
+router.post("/update-patient",updatePatient)
 
 export default router;
