@@ -61,7 +61,7 @@ export const getAppointments = async (req: Request, res: Response) => {
 
     // Status filter
     if (typeof req.query.status === "string") {
-      const validStatuses = ["PENDING", "ACCEPTED", "REJECTED"];
+      const validStatuses = ["PENDING", "ACCEPTED", "REJECTED","COMPLETED","ACTIVE"];
       const status = req.query.status.toUpperCase();
       if (validStatuses.includes(status)) {
         whereClause.status = status;
