@@ -15,10 +15,8 @@ export var ConsultationMode;
     ConsultationMode["ONLINE"] = "ONLINE";
 })(ConsultationMode || (ConsultationMode = {}));
 export const createAppointment = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    var _a;
     try {
-        const { doctorId, reason, mode } = req.body;
-        const patientId = (_a = req.user) === null || _a === void 0 ? void 0 : _a.id;
+        const { patientId, doctorId, reason, mode } = req.body;
         if (!patientId) {
             return res.status(401).json({ message: 'Unauthorized: Patient not logged in' });
         }
@@ -35,8 +33,6 @@ export const createAppointment = (req, res) => __awaiter(void 0, void 0, void 0,
                 reason,
                 mode: mode.toUpperCase(),
                 status: 'PENDING',
-                appointmentDate: undefined,
-                appointmentTime: null,
             },
         });
         return res.status(201).json({ message: 'Appointment request created', appointment });

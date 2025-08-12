@@ -10,8 +10,8 @@ export enum ConsultationMode {
 
 export const createAppointment = async (req: Request, res: Response) => {
   try {
-    const { doctorId, reason, mode } = req.body;
-    const patientId = (req as any).user?.id;
+    const {patientId, doctorId, reason, mode } = req.body;
+   
 
     if (!patientId) {
       return res.status(401).json({ message: 'Unauthorized: Patient not logged in' });
