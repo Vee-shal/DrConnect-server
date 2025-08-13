@@ -23,8 +23,7 @@ model User {
   doctorProfile  DoctorProfile?
   patientProfile Patient?
 
-
-   patientAppointments Appointment[] @relation("PatientAppointments")
+  patientAppointments Appointment[] @relation("PatientAppointments")
   doctorAppointments  Appointment[] @relation("DoctorAppointments")
 }
 
@@ -54,20 +53,20 @@ model Patient {
   bloodGroup String?
   createdAt  DateTime @default(now())
 }
-model Appointment {
-  id              Int               @id @default(autoincrement())
-  patientId       Int
-  doctorId        Int
-  appointmentDate DateTime?         
-  appointmentTime DateTime?
-  mode            ConsultationMode?  // Yeh hona chahiye
-  reason          String?
-  status          AppointmentStatus @default(PENDING)
-  createdAt       DateTime          @default(now())
-  updatedAt       DateTime          @updatedAt
 
-  patient         User              @relation("PatientAppointments", fields: [patientId], references: [id])
-  doctor          User              @relation("DoctorAppointments", fields: [doctorId], references: [id])
+model Appointment {
+  id          Int               @id @default(autoincrement())
+  patientId   Int
+  doctorId    Int
+  scheduledAt DateTime? // Stores both date & time
+  mode        ConsultationMode? // Yeh hona chahiye
+  reason      String?
+  status      AppointmentStatus @default(PENDING)
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  patient User @relation("PatientAppointments", fields: [patientId], references: [id])
+  doctor  User @relation("DoctorAppointments", fields: [doctorId], references: [id])
 }
 
 enum ConsultationMode {
@@ -79,4 +78,6 @@ enum AppointmentStatus {
   PENDING
   ACCEPTED
   REJECTED
+  ACTIVE
+  COMPLETED
 }

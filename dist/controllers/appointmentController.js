@@ -7,8 +7,8 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
         step((generator = generator.apply(thisArg, _arguments || [])).next());
     });
 };
-import { PrismaClient } from '@prisma/client';
-import { startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth } from 'date-fns';
+import { PrismaClient } from "@prisma/client";
+import { startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth, } from "date-fns";
 const prisma = new PrismaClient();
 export var ConsultationMode;
 (function (ConsultationMode) {
@@ -19,28 +19,35 @@ export const createAppointment = (req, res) => __awaiter(void 0, void 0, void 0,
     try {
         const { patientId, doctorId, reason, mode } = req.body;
         if (!patientId) {
-            return res.status(401).json({ message: 'Unauthorized: Patient not logged in' });
+            return res
+                .status(401)
+                .json({ message: "Unauthorized: Patient not logged in" });
         }
         if (!doctorId || !mode) {
-            return res.status(400).json({ message: 'doctorId and mode are required' });
+            return res
+                .status(400)
+                .json({ message: "doctorId and mode are required" });
         }
         if (!Object.values(ConsultationMode).includes(mode.toUpperCase())) {
-            return res.status(400).json({ message: 'Invalid mode value' });
+            return res.status(400).json({ message: "Invalid mode value" });
         }
         const appointment = yield prisma.appointment.create({
             data: {
-                patientId,
-                doctorId,
+                patientId: Number(patientId),
+                doctorId: Number(doctorId),
                 reason,
                 mode: mode.toUpperCase(),
-                status: 'PENDING',
+                status: "ACCEPTED",
+                scheduledAt: "2025-08-12T11:30:45.123Z",
             },
         });
-        return res.status(201).json({ message: 'Appointment request created', appointment });
+        return res
+            .status(201)
+            .json({ message: "Appointment request created", appointment });
     }
     catch (error) {
-        console.error('Create appointment error:', error);
-        return res.status(500).json({ message: 'Internal server error' });
+        console.error("Create appointment error:", error);
+        return res.status(500).json({ message: "Internal server error" });
     }
 });
 export const getAppointments = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
@@ -56,7 +63,13 @@ export const getAppointments = (req, res) => __awaiter(void 0, void 0, void 0, f
         }
         // Status filter
         if (typeof req.query.status === "string") {
-            const validStatuses = ["PENDING", "ACCEPTED", "REJECTED", "COMPLETED", "ACTIVE"];
+            const validStatuses = [
+                "PENDING",
+                "ACCEPTED",
+                "REJECTED",
+                "COMPLETED",
+                "ACTIVE",
+            ];
             const status = req.query.status.toUpperCase();
             if (validStatuses.includes(status)) {
                 whereClause.status = status;
@@ -124,4 +137,22 @@ export const getAppointments = (req, res) => __awaiter(void 0, void 0, void 0, f
             message: "Failed to fetch appointments",
         });
     }
+});
+export const updateAppointmentDetails = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    const { scheduledAt, appointmentId } = req.body;
+    const foundAppointment = yield prisma.appointment.findFirst({
+        where: { id: appointmentId },
+    });
+    if (!foundAppointment) {
+        res.status(401).json({
+            success: false,
+            message: "No appointment found with that id",
+        });
+    }
+    const updatedAppointment = yield prisma.appointment.update({
+        where: { id: appointmentId },
+        data: {
+            scheduledAt: scheduledAt
+        },
+    });
 });
