@@ -1,5 +1,7 @@
 import { Request, Response } from "express";
 import { PrismaClient } from "@prisma/client";
+import nodemailer from 'nodemailer';
+
 import {
   startOfDay,
   endOfDay,
@@ -8,6 +10,8 @@ import {
   startOfMonth,
   endOfMonth,
 } from "date-fns";
+import { success } from "zod";
+import axios from "axios";
 
 const prisma = new PrismaClient();
 
@@ -47,7 +51,7 @@ export const createAppointment = async (req: Request, res: Response) => {
         reason,
         mode: mode.toUpperCase() as ConsultationMode,
         status: "ACCEPTED",
-        scheduledAt : null
+        scheduledAt: null,
       },
     });
 
@@ -153,22 +157,138 @@ export const getAppointments = async (req: Request, res: Response) => {
   }
 };
 
-export const updateAppointmentDetails = async (req: Request, res: Response) => {
-  const { scheduledAt, appointmentId } = req.body;
-  const foundAppointment = await prisma.appointment.findFirst({
-    where: { id: appointmentId },
-  });
-  if (!foundAppointment) {
-    res.status(401).json({
-      success: false,
-      message: "No appointment found with that id",
-    });
-  }
 
-  const updatedAppointment = await prisma.appointment.update({
-    where: { id: appointmentId },
-    data: {
-       scheduledAt,
+
+
+
+const ZOOM_ACCOUNT_ID = "iiTC3M2YRhK_lmI8Oq-vqQ";
+const ZOOM_CLIENT_ID = "kJWdXoesRviL_mnZXymnyA";
+const ZOOM_CLIENT_SECRET = "oPnAKqppAmrGJqoJasvdVnWcDR98HQsm";
+
+// Get Zoom Access Token
+async function getZoomAccessToken() {
+  const tokenUrl = `https://zoom.us/oauth/token?grant_type=account_credentials&account_id=${ZOOM_ACCOUNT_ID}`;
+  
+  const authHeader = Buffer.from(`${ZOOM_CLIENT_ID}:${ZOOM_CLIENT_SECRET}`).toString("base64");
+
+  const response = await axios.post(tokenUrl, null, {
+    headers: {
+      Authorization: `Basic ${authHeader}`,
+      "Content-Type": "application/x-www-form-urlencoded",
     },
   });
+
+  return response.data.access_token;
+}
+
+// Create Zoom Meeting
+async function createZoomMeeting(hostEmail: string, scheduledAt: string) {
+  const accessToken = await getZoomAccessToken();
+
+  const meetingDetails = {
+    topic: "DrConnect Appointment",
+    type: 2, // Scheduled meeting
+    start_time: new Date(scheduledAt).toISOString(),
+    duration: 30, // minutes
+    timezone: "Asia/Kolkata",
+    settings: {
+      host_video: true,
+      participant_video: true,
+      join_before_host: false,
+    },
+  };
+
+  const response = await axios.post(
+    `https://api.zoom.us/v2/users/${hostEmail}/meetings`,
+    meetingDetails,
+    {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+      },
+    }
+  );
+
+  return response.data.join_url;
+}
+
+// Controller
+export const updateAppointmentDetails = async (req: Request, res: Response) => {
+  try {
+    const { scheduledAt, appointmentId, status, doctorEmail, patientEmail, mode } = req.body;
+
+    const foundAppointment = await prisma.appointment.findUnique({
+      where: { id: appointmentId },
+    });
+
+    if (!foundAppointment) {
+      return res.status(404).json({
+        success: false,
+        message: "No appointment found with that id",
+      });
+    }
+
+    // Create Zoom meeting if online appointment & accepted
+    let meetingLink: string | null = null;
+    if (status?.toLowerCase() === "accepted" && mode?.toLowerCase() === "online") {
+      meetingLink = await createZoomMeeting(doctorEmail, scheduledAt);
+    }
+
+    // Update appointment in DB
+    const updatedAppointment = await prisma.appointment.update({
+      where: { id: appointmentId },
+      data: {
+        scheduledAt,
+        status,
+        meetingLink: meetingLink ?? undefined,
+      },
+    });
+
+    // Send emails if accepted
+    if (status?.toLowerCase() === "accepted") {
+      const transporter = nodemailer.createTransport({
+        service: "gmail",
+        auth: {
+          user: process.env.SMTP_EMAIL,
+          pass: process.env.SMTP_PASSWORD,
+        },
+      });
+
+      let patientHtml = `<p>Hi, your appointment scheduled on <strong>${scheduledAt}</strong> has been accepted by the doctor.</p>`;
+      let doctorHtml = `<p>Hi Doctor, the appointment scheduled on <strong>${scheduledAt}</strong> has been accepted.</p>`;
+
+      if (meetingLink) {
+        patientHtml += `<p>Join your online appointment here: <a href="${meetingLink}">${meetingLink}</a></p>`;
+        doctorHtml += `<p>Join the online appointment here: <a href="${meetingLink}">${meetingLink}</a></p>`;
+      }
+
+      await Promise.all([
+        transporter.sendMail({
+          from: `"DrConnect" <${process.env.SMTP_EMAIL}>`,
+          to: patientEmail,
+          subject: "Your Appointment is Accepted!",
+          html: patientHtml,
+        }),
+        transporter.sendMail({
+          from: `"DrConnect" <${process.env.SMTP_EMAIL}>`,
+          to: doctorEmail,
+          subject: "New Appointment Accepted",
+          html: doctorHtml,
+        }),
+      ]);
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "Appointment details updated successfully",
+      data: updatedAppointment,
+    });
+  } catch (error) {
+    console.error("Error updating appointment:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Something went wrong while updating the appointment",
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
 };

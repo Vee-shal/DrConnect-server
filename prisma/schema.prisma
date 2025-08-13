@@ -64,9 +64,9 @@ model Appointment {
   status      AppointmentStatus @default(PENDING)
   createdAt   DateTime          @default(now())
   updatedAt   DateTime          @updatedAt
-
-  patient User @relation("PatientAppointments", fields: [patientId], references: [id])
-  doctor  User @relation("DoctorAppointments", fields: [doctorId], references: [id])
+  meetingLink String?
+  patient     User              @relation("PatientAppointments", fields: [patientId], references: [id])
+  doctor      User              @relation("DoctorAppointments", fields: [doctorId], references: [id])
 }
 
 enum ConsultationMode {
