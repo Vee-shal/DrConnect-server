@@ -1,5 +1,4 @@
 import { Request, Response } from "express";
-import { PrismaClient } from "@prisma/client";
 import nodemailer from "nodemailer";
 import {
   startOfDay,
@@ -10,10 +9,10 @@ import {
   endOfMonth,
 } from "date-fns";
 import axios from "axios";
+import prisma from "../config/db.js";
 const ZOOM_ACCOUNT_ID = "iiTC3M2YRhK_lmI8Oq-vqQ";
 const ZOOM_CLIENT_ID = "kJWdXoesRviL_mnZXymnyA";
 const ZOOM_CLIENT_SECRET = "oPnAKqppAmrGJqoJasvdVnWcDR98HQsm";
-const prisma = new PrismaClient();
 
 export enum ConsultationMode {
   OFFLINE = "OFFLINE",

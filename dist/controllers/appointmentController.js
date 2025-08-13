@@ -7,11 +7,13 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
         step((generator = generator.apply(thisArg, _arguments || [])).next());
     });
 };
-import { PrismaClient } from "@prisma/client";
-import nodemailer from 'nodemailer';
+import nodemailer from "nodemailer";
 import { startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth, } from "date-fns";
 import axios from "axios";
-const prisma = new PrismaClient();
+import prisma from "../config/db.js";
+const ZOOM_ACCOUNT_ID = "iiTC3M2YRhK_lmI8Oq-vqQ";
+const ZOOM_CLIENT_ID = "kJWdXoesRviL_mnZXymnyA";
+const ZOOM_CLIENT_SECRET = "oPnAKqppAmrGJqoJasvdVnWcDR98HQsm";
 export var ConsultationMode;
 (function (ConsultationMode) {
     ConsultationMode["OFFLINE"] = "OFFLINE";
@@ -140,9 +142,6 @@ export const getAppointments = (req, res) => __awaiter(void 0, void 0, void 0, f
         });
     }
 });
-const ZOOM_ACCOUNT_ID = "iiTC3M2YRhK_lmI8Oq-vqQ";
-const ZOOM_CLIENT_ID = "kJWdXoesRviL_mnZXymnyA";
-const ZOOM_CLIENT_SECRET = "oPnAKqppAmrGJqoJasvdVnWcDR98HQsm";
 // Get Zoom Access Token
 function getZoomAccessToken() {
     return __awaiter(this, void 0, void 0, function* () {
@@ -158,7 +157,7 @@ function getZoomAccessToken() {
     });
 }
 // Create Zoom Meeting
-function createZoomMeeting(hostEmail, scheduledAt) {
+function createZoomMeeting(scheduledAt) {
     return __awaiter(this, void 0, void 0, function* () {
         const accessToken = yield getZoomAccessToken();
         const meetingDetails = {
@@ -185,7 +184,7 @@ function createZoomMeeting(hostEmail, scheduledAt) {
 // Controller
 export const updateAppointmentDetails = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const { scheduledAt, appointmentId, status, doctorEmail, patientEmail, mode } = req.body;
+        const { scheduledAt, appointmentId, status, doctorEmail, patientEmail, mode, } = req.body;
         const foundAppointment = yield prisma.appointment.findUnique({
             where: { id: appointmentId },
         });
@@ -197,8 +196,9 @@ export const updateAppointmentDetails = (req, res) => __awaiter(void 0, void 0, 
         }
         // Create Zoom meeting if online appointment & accepted
         let meetingLink = null;
-        if ((status === null || status === void 0 ? void 0 : status.toLowerCase()) === "accepted" && (mode === null || mode === void 0 ? void 0 : mode.toLowerCase()) === "online") {
-            meetingLink = yield createZoomMeeting(doctorEmail, scheduledAt);
+        if ((status === null || status === void 0 ? void 0 : status.toLowerCase()) === "accepted" &&
+            (mode === null || mode === void 0 ? void 0 : mode.toLowerCase()) === "online") {
+            meetingLink = yield createZoomMeeting(scheduledAt);
         }
         // Update appointment in DB
         const updatedAppointment = yield prisma.appointment.update({

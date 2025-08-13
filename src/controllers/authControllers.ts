@@ -1,4 +1,3 @@
-import prisma from "../config/db.js";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import dotenv from "dotenv";
@@ -9,6 +8,7 @@ import {
 } from "../validators/userSchemas.js";
 import { createClient } from "redis";
 import nodemailer from "nodemailer";
+import prisma from "../config/db.js";
 
 
 dotenv.config();

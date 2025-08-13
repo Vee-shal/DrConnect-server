@@ -7,13 +7,13 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
         step((generator = generator.apply(thisArg, _arguments || [])).next());
     });
 };
-import prisma from "../config/db.js";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import dotenv from "dotenv";
 import { registerUserSchema, loginUserSchema, } from "../validators/userSchemas.js";
 import { createClient } from "redis";
 import nodemailer from "nodemailer";
+import prisma from "../config/db.js";
 dotenv.config();
 // Redis Client Setup
 const redisClient = createClient({
