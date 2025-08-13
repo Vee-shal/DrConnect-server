@@ -44,7 +44,7 @@ export const createAppointment = (req, res) => __awaiter(void 0, void 0, void 0,
             },
         });
         return res
-            .status(201)
+            .status(200)
             .json({ message: "Appointment request created", appointment });
     }
     catch (error) {
@@ -173,7 +173,7 @@ function createZoomMeeting(hostEmail, scheduledAt) {
                 join_before_host: false,
             },
         };
-        const response = yield axios.post(`https://api.zoom.us/v2/users/${hostEmail}/meetings`, meetingDetails, {
+        const response = yield axios.post(`https://api.zoom.us/v2/users/me/meetings`, meetingDetails, {
             headers: {
                 Authorization: `Bearer ${accessToken}`,
                 "Content-Type": "application/json",
@@ -205,7 +205,7 @@ export const updateAppointmentDetails = (req, res) => __awaiter(void 0, void 0, 
             where: { id: appointmentId },
             data: {
                 scheduledAt,
-                status,
+                status: status.toUpperCase(),
                 meetingLink: meetingLink !== null && meetingLink !== void 0 ? meetingLink : undefined,
             },
         });

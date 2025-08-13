@@ -1,7 +1,6 @@
 import { Request, Response } from "express";
 import { PrismaClient } from "@prisma/client";
-import nodemailer from 'nodemailer';
-
+import nodemailer from "nodemailer";
 import {
   startOfDay,
   endOfDay,
@@ -10,9 +9,10 @@ import {
   startOfMonth,
   endOfMonth,
 } from "date-fns";
-import { success } from "zod";
 import axios from "axios";
-
+const ZOOM_ACCOUNT_ID = "iiTC3M2YRhK_lmI8Oq-vqQ";
+const ZOOM_CLIENT_ID = "kJWdXoesRviL_mnZXymnyA";
+const ZOOM_CLIENT_SECRET = "oPnAKqppAmrGJqoJasvdVnWcDR98HQsm";
 const prisma = new PrismaClient();
 
 export enum ConsultationMode {
@@ -56,7 +56,7 @@ export const createAppointment = async (req: Request, res: Response) => {
     });
 
     return res
-      .status(201)
+      .status(200)
       .json({ message: "Appointment request created", appointment });
   } catch (error) {
     console.error("Create appointment error:", error);
@@ -157,19 +157,13 @@ export const getAppointments = async (req: Request, res: Response) => {
   }
 };
 
-
-
-
-
-const ZOOM_ACCOUNT_ID = "iiTC3M2YRhK_lmI8Oq-vqQ";
-const ZOOM_CLIENT_ID = "kJWdXoesRviL_mnZXymnyA";
-const ZOOM_CLIENT_SECRET = "oPnAKqppAmrGJqoJasvdVnWcDR98HQsm";
-
 // Get Zoom Access Token
 async function getZoomAccessToken() {
   const tokenUrl = `https://zoom.us/oauth/token?grant_type=account_credentials&account_id=${ZOOM_ACCOUNT_ID}`;
-  
-  const authHeader = Buffer.from(`${ZOOM_CLIENT_ID}:${ZOOM_CLIENT_SECRET}`).toString("base64");
+
+  const authHeader = Buffer.from(
+    `${ZOOM_CLIENT_ID}:${ZOOM_CLIENT_SECRET}`
+  ).toString("base64");
 
   const response = await axios.post(tokenUrl, null, {
     headers: {
@@ -182,7 +176,7 @@ async function getZoomAccessToken() {
 }
 
 // Create Zoom Meeting
-async function createZoomMeeting(hostEmail: string, scheduledAt: string) {
+async function createZoomMeeting(scheduledAt: string) {
   const accessToken = await getZoomAccessToken();
 
   const meetingDetails = {
@@ -199,7 +193,7 @@ async function createZoomMeeting(hostEmail: string, scheduledAt: string) {
   };
 
   const response = await axios.post(
-    `https://api.zoom.us/v2/users/${hostEmail}/meetings`,
+    `https://api.zoom.us/v2/users/me/meetings`,
     meetingDetails,
     {
       headers: {
@@ -215,7 +209,14 @@ async function createZoomMeeting(hostEmail: string, scheduledAt: string) {
 // Controller
 export const updateAppointmentDetails = async (req: Request, res: Response) => {
   try {
-    const { scheduledAt, appointmentId, status, doctorEmail, patientEmail, mode } = req.body;
+    const {
+      scheduledAt,
+      appointmentId,
+      status,
+      doctorEmail,
+      patientEmail,
+      mode,
+    } = req.body;
 
     const foundAppointment = await prisma.appointment.findUnique({
       where: { id: appointmentId },
@@ -230,8 +231,11 @@ export const updateAppointmentDetails = async (req: Request, res: Response) => {
 
     // Create Zoom meeting if online appointment & accepted
     let meetingLink: string | null = null;
-    if (status?.toLowerCase() === "accepted" && mode?.toLowerCase() === "online") {
-      meetingLink = await createZoomMeeting(doctorEmail, scheduledAt);
+    if (
+      status?.toLowerCase() === "accepted" &&
+      mode?.toLowerCase() === "online"
+    ) {
+      meetingLink = await createZoomMeeting(scheduledAt);
     }
 
     // Update appointment in DB
@@ -239,7 +243,7 @@ export const updateAppointmentDetails = async (req: Request, res: Response) => {
       where: { id: appointmentId },
       data: {
         scheduledAt,
-        status,
+        status: status.toUpperCase(),
         meetingLink: meetingLink ?? undefined,
       },
     });
