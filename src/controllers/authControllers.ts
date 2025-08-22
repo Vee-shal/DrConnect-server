@@ -9,7 +9,7 @@ import {
 import { createClient } from "redis";
 import nodemailer from "nodemailer";
 import prisma from "../config/db.js";
-
+import { uploadTOCloudinary } from "../middlewares/upload.js"; 
 
 dotenv.config();
 
@@ -32,6 +32,11 @@ redisClient.connect();
 
 export const registerUser = async (req: Request, res: Response) => {
   try {
+    // ✅ req.body undefined na ho
+    if (!req.body) {
+      return res.status(400).json({ message: "No data provided" });
+    }
+
     const parseResult = registerUserSchema.safeParse(req.body);
     if (!parseResult.success) {
       return res.status(400).json({
@@ -49,40 +54,32 @@ export const registerUser = async (req: Request, res: Response) => {
       specialization,
       experience,
       license,
-      verified,
     } = parseResult.data;
 
-    // Check if user already exists
-    const existingUser = await prisma.user.findUnique({ where: { email } });
-    if (existingUser) {
-      return res.status(409).json({ message: "User already exists." });
+    // ✅ certificate upload
+    let certificateUrl: string | null = null;
+    if (role === "doctor" && req.file) {
+      const uploadResult = await uploadTOCloudinary(req.file);
+      certificateUrl = uploadResult;
     }
 
-    // Hash password
-    const hashedPassword = await bcrypt.hash(password, 10);
-
-    // Check role
-    const isDoctor = role === "doctor";
-    // Create user based on role
+    // ✅ create user
     const user = await prisma.user.create({
       data: {
         name,
         email,
         phoneNumber: phone_number,
-        password: hashedPassword,
+        password: await bcrypt.hash(password, 10),
         role,
         specialization: role === "doctor" ? specialization : null,
         experience: role === "doctor" ? experience : null,
         license: role === "doctor" ? license : null,
-        verified : false,
-        // certificateURL:
-        //   role === "doctor" && certificate
-        //     ? Buffer.from(certificate, "base64")
-        //     : null,
+        verified: false,
+        certificate: certificateUrl,
       },
     });
 
-    // Generate token
+    // ✅ generate token
     const token = jwt.sign(
       { id: user.id, email: user.email, role: user.role },
       process.env.JWT_SECRET as string,
@@ -100,7 +97,8 @@ export const registerUser = async (req: Request, res: Response) => {
         specialization: user.specialization,
         experience: user.experience,
         license: user.license,
-        verified,
+        certificate: user.certificate,
+        verified: user.verified,
       },
       token,
       status: 200,
@@ -110,6 +108,9 @@ export const registerUser = async (req: Request, res: Response) => {
     return res.status(500).json({ message: "Server error" });
   }
 };
+
+
+
 
 
 
@@ -159,6 +160,7 @@ export const userLogin = async (req: Request, res: Response) => {
         experience: user.experience,
         license: user.license,
         verified: user.verified,
+        profilePhoto: user.profilePhoto || null,
         // certificate: user.certificateURL
         //   ? Buffer.from(user.certificateURL).toString("base64")
         //   : null,

@@ -9,6 +9,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 };
 import nodemailer from "nodemailer";
 import { startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth, } from "date-fns";
+import { generatePDFBuffer } from "../utils/pdfHelper.js";
 import axios from "axios";
 import prisma from "../config/db.js";
 const ZOOM_ACCOUNT_ID = "iiTC3M2YRhK_lmI8Oq-vqQ";
@@ -41,7 +42,7 @@ export const createAppointment = (req, res) => __awaiter(void 0, void 0, void 0,
                 doctorId: Number(doctorId),
                 reason,
                 mode: mode.toUpperCase(),
-                status: "ACCEPTED",
+                status: "PENDING",
                 scheduledAt: null,
             },
         });
@@ -184,23 +185,21 @@ function createZoomMeeting(scheduledAt) {
 // Controller
 export const updateAppointmentDetails = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const { scheduledAt, appointmentId, status, doctorEmail, patientEmail, mode, } = req.body;
+        const { scheduledAt, appointmentId, status, doctorEmail, patientEmail, mode } = req.body;
+        // 1️⃣ Find appointment with patient & doctor
         const foundAppointment = yield prisma.appointment.findUnique({
             where: { id: appointmentId },
+            include: { patient: true, doctor: true },
         });
         if (!foundAppointment) {
-            return res.status(404).json({
-                success: false,
-                message: "No appointment found with that id",
-            });
+            return res.status(404).json({ success: false, message: "No appointment found with that id" });
         }
-        // Create Zoom meeting if online appointment & accepted
+        // 2️⃣ Create Zoom link if online appointment
         let meetingLink = null;
-        if ((status === null || status === void 0 ? void 0 : status.toLowerCase()) === "accepted" &&
-            (mode === null || mode === void 0 ? void 0 : mode.toLowerCase()) === "online") {
+        if ((status === null || status === void 0 ? void 0 : status.toLowerCase()) === "accepted" && (mode === null || mode === void 0 ? void 0 : mode.toLowerCase()) === "online") {
             meetingLink = yield createZoomMeeting(scheduledAt);
         }
-        // Update appointment in DB
+        // 3️⃣ Update appointment in DB
         const updatedAppointment = yield prisma.appointment.update({
             where: { id: appointmentId },
             data: {
@@ -209,39 +208,50 @@ export const updateAppointmentDetails = (req, res) => __awaiter(void 0, void 0, 
                 meetingLink: meetingLink !== null && meetingLink !== void 0 ? meetingLink : undefined,
             },
         });
-        // Send emails if accepted
-        if ((status === null || status === void 0 ? void 0 : status.toLowerCase()) === "accepted") {
-            const transporter = nodemailer.createTransport({
-                service: "gmail",
-                auth: {
-                    user: process.env.SMTP_EMAIL,
-                    pass: process.env.SMTP_PASSWORD,
-                },
-            });
-            let patientHtml = `<p>Hi, your appointment scheduled on <strong>${scheduledAt}</strong> has been accepted by the doctor.</p>`;
-            let doctorHtml = `<p>Hi Doctor, the appointment scheduled on <strong>${scheduledAt}</strong> has been accepted.</p>`;
-            if (meetingLink) {
-                patientHtml += `<p>Join your online appointment here: <a href="${meetingLink}">${meetingLink}</a></p>`;
-                doctorHtml += `<p>Join the online appointment here: <a href="${meetingLink}">${meetingLink}</a></p>`;
-            }
-            yield Promise.all([
-                transporter.sendMail({
-                    from: `"DrConnect" <${process.env.SMTP_EMAIL}>`,
-                    to: patientEmail,
-                    subject: "Your Appointment is Accepted!",
-                    html: patientHtml,
-                }),
-                transporter.sendMail({
-                    from: `"DrConnect" <${process.env.SMTP_EMAIL}>`,
-                    to: doctorEmail,
-                    subject: "New Appointment Accepted",
-                    html: doctorHtml,
-                }),
-            ]);
+        // 4️⃣ Setup nodemailer
+        const transporter = nodemailer.createTransport({
+            service: "gmail",
+            auth: { user: process.env.SMTP_EMAIL, pass: process.env.SMTP_PASSWORD },
+        });
+        // 5️⃣ Prepare email HTML
+        let patientHtml = `
+      <p>Hello,</p>
+      <p>Your appointment on <strong>${scheduledAt}</strong> has been accepted by the doctor.</p>
+      ${(mode === null || mode === void 0 ? void 0 : mode.toLowerCase()) === "online" && meetingLink ? `<p>Join online: <a href="${meetingLink}">${meetingLink}</a></p>` : ""}
+      <p>Best regards,<br/>DrConnect Team</p>
+    `;
+        let doctorHtml = `
+      <p>Hello Doctor,</p>
+      <p>Appointment scheduled on <strong>${scheduledAt}</strong> has been approved.</p>
+      ${(mode === null || mode === void 0 ? void 0 : mode.toLowerCase()) === "online" && meetingLink ? `<p>Join online: <a href="${meetingLink}">${meetingLink}</a></p>` : ""}
+      <p>Thank you,<br/>DrConnect Team</p>
+    `;
+        // 6️⃣ If offline → generate PDF receipt
+        let pdfBuffer = null;
+        if ((status === null || status === void 0 ? void 0 : status.toLowerCase()) === "accepted" && (mode === null || mode === void 0 ? void 0 : mode.toLowerCase()) === "offline") {
+            pdfBuffer = yield generatePDFBuffer(foundAppointment, scheduledAt);
+            patientHtml += `<p>Please find your receipt attached.</p>`;
         }
+        // 7️⃣ Send emails
+        yield Promise.all([
+            transporter.sendMail({
+                from: `"DrConnect" <${process.env.SMTP_EMAIL}>`,
+                to: patientEmail,
+                subject: "Your Appointment is Accepted!",
+                html: patientHtml,
+                attachments: pdfBuffer ? [{ filename: "Appointment_Receipt.pdf", content: pdfBuffer }] : [],
+            }),
+            transporter.sendMail({
+                from: `"DrConnect" <${process.env.SMTP_EMAIL}>`,
+                to: doctorEmail,
+                subject: "New Appointment Accepted",
+                html: doctorHtml,
+            }),
+        ]);
+        // 8️⃣ Return success response
         return res.status(200).json({
             success: true,
-            message: "Appointment details updated successfully",
+            message: "Appointment updated successfully",
             data: updatedAppointment,
         });
     }

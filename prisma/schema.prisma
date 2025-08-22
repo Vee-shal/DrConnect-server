@@ -19,10 +19,11 @@ model User {
   license        String?
   verified       Boolean  @default(false)
   createdAt      DateTime @default(now())
-
+  profilePhoto   String?    
   doctorProfile  DoctorProfile?
   patientProfile Patient?
-
+  certificate    String?  
+  
   patientAppointments Appointment[] @relation("PatientAppointments")
   doctorAppointments  Appointment[] @relation("DoctorAppointments")
 }
@@ -39,6 +40,8 @@ model DoctorProfile {
   clinicName    String?
   clinicAddress String?
   offlinePrice  Int?
+   
+ 
   createdAt     DateTime @default(now())
 }
 
