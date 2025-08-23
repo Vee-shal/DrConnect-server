@@ -1,0 +1,47 @@
+import { Request, Response } from "express";
+import prisma from "../config/db.js";
+
+// Create a new chat
+export const createChat = async (req: Request, res: Response) => {
+  try {
+    const { userId } = req.body;
+    const chat = await prisma.chat.create({
+      data: { userId },
+    });
+    res.status(201).json(chat);
+  } catch (err) {
+    res.status(500).json({ error: "Failed to create chat", details: err });
+  }
+};
+
+// Add message to chat
+export const addMessage = async (req: Request, res: Response) => {
+  try {
+    const { chatId, senderId, content } = req.body;
+    const message = await prisma.message.create({
+      data: {
+        chatId,
+        senderId,
+        content,
+      },
+    });
+    res.status(201).json(message);
+  } catch (err) {
+    res.status(500).json({ error: "Failed to add message", details: err });
+  }
+};
+
+// Get messages for a chat
+export const getMessages = async (req: Request, res: Response) => {
+  try {
+    const { chatId } = req.params;
+    const messages = await prisma.message.findMany({
+      where: { chatId: Number(chatId) },
+      orderBy: { createdAt: "asc" },
+      include: { sender: { select: { id: true, name: true, role: true } } },
+    });
+    res.json(messages);
+  } catch (err) {
+    res.status(500).json({ error: "Failed to fetch messages", details: err });
+  }
+};

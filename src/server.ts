@@ -7,6 +7,8 @@ import doctorRoutes from  "./routes/doctorRoutes.js"
 import patientRoutes from  "./routes/patientRoutes.js"
 import appointmentRoutes from "./routes/appointmentRoute.js";
 import uploadRoutes from "./routes/uploadRoute.js";
+import chatbotRouter from "./routes/chatbot.js";
+import chatRoute from "./routes/chatRoute.js";
 
 dotenv.config();
 
@@ -22,7 +24,8 @@ app.use("/api/doctor" , doctorRoutes)
 app.use("/api/patient" , patientRoutes)
 app.use("/api/appointment", appointmentRoutes);
 app.use("/api/upload", uploadRoutes);
-
+app.use("/api/chatbot", chatbotRouter);
+app.use("/api/chat", chatRoute);
 
 // Start server
 const PORT = process.env.PORT || 5000;
