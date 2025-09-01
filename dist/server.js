@@ -9,6 +9,8 @@ import appointmentRoutes from "./routes/appointmentRoute.js";
 import uploadRoutes from "./routes/uploadRoute.js";
 import chatbotRouter from "./routes/chatbot.js";
 import chatRoute from "./routes/chatRoute.js";
+import adminAuthRoutes from "./routes/adminAuthRoute.js";
+import adminRoutes from "./routes/adminRoute.js";
 dotenv.config();
 const app = express();
 // Middleware
@@ -22,6 +24,8 @@ app.use("/api/appointment", appointmentRoutes);
 app.use("/api/upload", uploadRoutes);
 app.use("/api/chatbot", chatbotRouter);
 app.use("/api/chat", chatRoute);
+app.use("/api/admin", adminAuthRoutes);
+app.use("/api/admin-all", adminRoutes);
 // Start server
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
